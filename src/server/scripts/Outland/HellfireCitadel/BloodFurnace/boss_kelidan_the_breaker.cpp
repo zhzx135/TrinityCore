@@ -124,6 +124,7 @@ struct boss_kelidan_the_breaker : public BossAI
         Talk(SAY_SLAY);
     }
 
+    
     void ChannelerEngaged(Unit* who)
     {
         for (uint8 i = 0; i<5; ++i)

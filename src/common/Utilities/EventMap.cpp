@@ -20,6 +20,8 @@
 
 void EventMap::Reset()
 {
+
+    
     _eventMap.clear();
     _time = TimePoint::min();
     _phaseMask = 0;
