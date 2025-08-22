@@ -74,12 +74,28 @@ Position const ShadowmoonChannelers[5] =
 // 17377 - Keli'dan the Breaker
 struct boss_kelidan_the_breaker : public BossAI
 {
-    boss_kelidan_the_breaker(Creature* creature) : BossAI(creature, DATA_KELIDAN_THE_BREAKER)
+    /**
+     * @brief 构造函数，初始化 Kelidan the Breaker 的 Boss AI。
+     *
+     * @param creature 指向 Creature 对象的指针，表示该 Boss 的实体。
+     * @note 初始化时会调用 Initialize() 方法，并设置 Firenova_Timer 为 0。
+     */
+    boss_kelidan_the_breaker(Creature *creature) : BossAI(creature, DATA_KELIDAN_THE_BREAKER)
     {
         Initialize();
         Firenova_Timer = 0;
     }
 
+    /**
+     * @brief 初始化战斗相关的计时器和状态。
+     *
+     * 设置以下计时器和状态：
+     * - ShadowVolley_Timer: 初始化为1000毫秒。
+     * - BurningNova_Timer: 初始化为15000毫秒。
+     * - Corruption_Timer: 初始化为5000毫秒。
+     * - check_Timer: 初始化为0。
+     * - Firenova: 初始化为false。
+     */
     void Initialize()
     {
         ShadowVolley_Timer = 1000;
@@ -97,6 +113,16 @@ struct boss_kelidan_the_breaker : public BossAI
     bool Firenova;
     ObjectGuid Channelers[5];
 
+    /**
+     * 重置当前对象的状态。
+     * 执行以下操作：
+     * 1. 调用基类的重置逻辑。
+     * 2. 初始化当前对象。
+     * 3. 召唤相关的通道施法者。
+     * 4. 设置对象对NPC免疫。
+     * 5. 将对象的反应状态设置为被动。
+     * 6. 标记对象为不可攻击。
+     */
     void Reset() override
     {
         _Reset();
@@ -107,7 +133,18 @@ struct boss_kelidan_the_breaker : public BossAI
         me->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
     }
 
-    void JustEngagedWith(Unit* who) override
+    /**
+     * @brief 当Boss与目标单位进入战斗状态时调用。
+     *
+     * @param who 触发战斗的目标单位。
+     *
+     * 功能说明：
+     * 1. 调用基类BossAI的JustEngagedWith方法，处理基础战斗逻辑。
+     * 2. 播放Boss的唤醒语音（SAY_WAKE）。
+     * 3. 如果Boss正在施放非近战法术，则中断这些法术。
+     * 4. 启动Boss对目标的移动行为。
+     */
+    void JustEngagedWith(Unit *who) override
     {
         BossAI::JustEngagedWith(who);
         Talk(SAY_WAKE);
@@ -116,7 +153,13 @@ struct boss_kelidan_the_breaker : public BossAI
         DoStartMovement(who);
     }
 
-    void KilledUnit(Unit* /*victim*/) override
+    /**
+     * 当生物被击杀时触发的事件处理函数。
+     *
+     * @param victim 被击杀的生物对象（未使用，因此被注释掉）。
+     * @note 有50%的概率不执行任何操作，否则会触发 SAY_SLAY 的对话。
+     */
+    void KilledUnit(Unit * /*victim*/) override
     {
         if (rand32() % 2)
             return;
@@ -124,10 +167,16 @@ struct boss_kelidan_the_breaker : public BossAI
         Talk(SAY_SLAY);
     }
 
-    
-    void ChannelerEngaged(Unit* who)
+    /**
+     * @brief 当某个单位（who）与当前对象交互时，触发所有未进入战斗状态的 Channelers 攻击该单位。
+     *
+     * @param who 触发交互的单位指针。如果为 nullptr，则不会触发任何动作。
+     * @note 该函数会遍历预定义的 Channelers 列表，检查每个 Channeler 是否未处于战斗状态，
+     *       如果是，则通过其 AI 控制模块发起对目标单位的攻击。
+     */
+    void ChannelerEngaged(Unit *who)
     {
-        for (uint8 i = 0; i<5; ++i)
+        for (uint8 i = 0; i < 5; ++i)
         {
             Creature* channeler = ObjectAccessor::GetCreature(*me, Channelers[i]);
             if (who && channeler && !channeler->IsInCombat())
@@ -135,7 +184,18 @@ struct boss_kelidan_the_breaker : public BossAI
         }
     }
 
-    void ChannelerDied(Unit* killer)
+    /**
+     * @brief 当某个“Channeler”（引导者）死亡时调用此函数。
+     *
+     * 此函数检查所有引导者是否均已死亡。如果是，则：
+     * 1. 将当前单位（me）设置为主动攻击状态（REACT_AGGRESSIVE）。
+     * 2. 取消对NPC的免疫状态。
+     * 3. 移除“不可攻击”标志（UNIT_FLAG_NON_ATTACKABLE）。
+     * 4. 如果存在击杀者（killer），则开始攻击该击杀者。
+     *
+     * @param killer 击杀引导者的单位指针，可能为空。
+     */
+    void ChannelerDied(Unit *killer)
     {
         for (uint8 i = 0; i < 5; ++i)
         {
@@ -150,7 +210,16 @@ struct boss_kelidan_the_breaker : public BossAI
             AttackStart(killer);
     }
 
-    ObjectGuid GetChanneled(Creature* channeler1)
+    /**
+     * @brief 获取与指定引导者相关联的另一个引导者的GUID。
+     *
+     * 此函数首先调用SummonChannelers()来确保所有引导者已生成，然后根据传入的引导者GUID，
+     * 在预定义的引导者列表中查找匹配项，并返回列表中偏移量为2的引导者GUID。
+     *
+     * @param channeler1 指向需要查找的引导者Creature对象的指针。
+     * @return ObjectGuid 返回与传入引导者相关联的另一个引导者的GUID；如果传入的指针为空，则返回空GUID。
+     */
+    ObjectGuid GetChanneled(Creature *channeler1)
     {
         SummonChannelers();
         if (!channeler1)
@@ -166,6 +235,15 @@ struct boss_kelidan_the_breaker : public BossAI
         return Channelers[(i + 2) % 5];
     }
 
+    /**
+     * @brief 召唤并管理5个Channelers（施法者）。
+     *
+     * 该函数遍历5个位置，检查每个位置是否存在有效的Channeler。如果Channeler不存在或已死亡，
+     * 则在该位置召唤一个新的Channeler。召唤成功后，更新Channelers数组中的GUID；
+     * 如果召唤失败，则清除对应位置的GUID。
+     *
+     * @note 召唤的Channeler会在5分钟后自动消失（CORPSE_TIMED_DESPAWN）。
+     */
     void SummonChannelers()
     {
         for (uint8 i = 0; i < 5; ++i)
@@ -180,12 +258,33 @@ struct boss_kelidan_the_breaker : public BossAI
         }
     }
 
-    void JustDied(Unit* /*killer*/) override
+    /**
+     * 当生物死亡时触发的事件处理函数。
+     * 重写基类方法，执行死亡后的逻辑：
+     * 1. 调用基类的死亡处理逻辑 `_JustDied`。
+     * 2. 播放死亡时的对话文本 `SAY_DEATH`。
+     *
+     * @param killer 击杀者单位指针（未使用，注释掉以明确意图）。
+     */
+    void JustDied(Unit * /*killer*/) override
     {
         _JustDied();
         Talk(SAY_DEATH);
     }
 
+    /**
+     * @brief 更新AI逻辑，处理怪物的战斗行为。
+     *
+     * 该函数根据时间差（diff）更新怪物的AI行为，包括技能释放、状态检查和攻击逻辑。
+     * 主要逻辑包括：
+     * - 检查是否有目标（UpdateVictim），如果没有目标则尝试释放SPELL_EVOCATION。
+     * - 处理Firenova状态，释放SPELL_FIRE_NOVA并重置相关计时器。
+     * - 释放SPELL_SHADOW_BOLT_VOLLEY和SPELL_CORRUPTION技能，并根据计时器控制释放频率。
+     * - 处理BurningNova状态，释放SPELL_BURNING_NOVA，并在英雄模式下执行传送逻辑。
+     * - 最后调用DoMeleeAttackIfReady()执行近战攻击。
+     *
+     * @param diff 时间差（毫秒），用于更新计时器和技能冷却。
+     */
     void UpdateAI(uint32 diff) override
     {
         if (!UpdateVictim())
@@ -257,11 +356,25 @@ struct boss_kelidan_the_breaker : public BossAI
 // 17653 - Shadowmoon Channeler
 struct npc_shadowmoon_channeler : public ScriptedAI
 {
-    npc_shadowmoon_channeler(Creature* creature) : ScriptedAI(creature)
+    /**
+     * @brief 构造函数，初始化 Shadowmoon Channeler NPC 的 AI 脚本。
+     *
+     * @param creature 指向 Creature 对象的指针，表示该 NPC 的实例。
+     * @note 此构造函数会调用 Initialize() 方法完成初始化。
+     */
+    npc_shadowmoon_channeler(Creature *creature) : ScriptedAI(creature)
     {
         Initialize();
     }
 
+    /**
+     * @brief 初始化函数，用于设置计时器的初始值。
+     *
+     * 该函数为以下计时器设置随机初始值：
+     * - ShadowBolt_Timer: 1000到2000毫秒之间的随机值
+     * - MarkOfShadow_Timer: 5000到7000毫秒之间的随机值
+     * - check_Timer: 固定为0
+     */
     void Initialize()
     {
         ShadowBolt_Timer = 1000 + rand32() % 1000;
@@ -273,6 +386,14 @@ struct npc_shadowmoon_channeler : public ScriptedAI
     uint32 MarkOfShadow_Timer;
     uint32 check_Timer;
 
+    /**
+     * @brief 重置当前对象的状态。
+     *
+     * 该函数会调用 Initialize() 方法重新初始化对象，
+     * 并检查当前对象是否正在施放非近战法术，如果是则强制中断所有非近战法术。
+     *
+     * @note 此函数通常用于重置战斗或状态相关的逻辑。
+     */
     void Reset() override
     {
         Initialize();
@@ -280,7 +401,18 @@ struct npc_shadowmoon_channeler : public ScriptedAI
             me->InterruptNonMeleeSpells(true);
     }
 
-    void JustEngagedWith(Unit* who) override
+    /**
+     * @brief 当生物与目标单位进入战斗状态时调用。
+     *
+     * 此函数在生物与目标单位进入战斗时触发，执行以下操作：
+     * 1. 播放战斗喊话（SAY_AGGRO）。
+     * 2. 如果附近存在NPC_KELIDAN（距离100码内），则通知其AI（boss_kelidan_the_breaker）有通道者进入战斗。
+     * 3. 如果当前正在施放非近战法术，则中断这些法术。
+     * 4. 开始向目标单位移动。
+     *
+     * @param who 触发战斗的目标单位指针。
+     */
+    void JustEngagedWith(Unit *who) override
     {
         Talk(SAY_AGGRO);
 
@@ -291,7 +423,14 @@ struct npc_shadowmoon_channeler : public ScriptedAI
         DoStartMovement(who);
     }
 
-    void JustDied(Unit* killer) override
+    /**
+     * @brief 当单位死亡时触发的事件处理函数。
+     *
+     * @param killer 击杀该单位的凶手对象。
+     * @note 如果凶手不存在，则直接返回。
+     * @note 如果附近存在NPC Kelidan，则通知其AI处理该死亡事件。
+     */
+    void JustDied(Unit *killer) override
     {
         if (!killer)
             return;
@@ -300,6 +439,17 @@ struct npc_shadowmoon_channeler : public ScriptedAI
             ENSURE_AI(boss_kelidan_the_breaker, Kelidan->AI())->ChannelerDied(killer);
     }
 
+/**
+ * @brief 更新AI逻辑，处理怪物的行为。
+ *
+ * 该函数是怪物AI的核心逻辑，负责根据时间差（diff）更新怪物的行为状态。
+ * 主要功能包括：
+ * - 检查是否有目标（UpdateVictim），如果没有目标，则尝试寻找并施放通道法术（SPELL_CHANNELING）。
+ * - 如果有目标，则根据计时器施放暗影标记（SPELL_MARK_OF_SHADOW）和暗影箭（SPELL_SHADOW_BOLT）。
+ * - 如果目标在近战范围内，则执行近战攻击（DoMeleeAttackIfReady）。
+ *
+ * @param diff 时间差（毫秒），用于更新计时器。
+ */
     void UpdateAI(uint32 diff) override
     {
         if (!UpdateVictim())
